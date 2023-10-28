@@ -1,13 +1,19 @@
-use std::net::TcpListener; 
-use std::net::TcpStream;
-use std::io::prelude::*;
+use std::{
+    fs,
+    io::{prelude::*,BufReader},
+    net::{TcpListener, TcpStream},
+    thread,
+    time::Duration,
+};
 
 fn main() {
 
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        handleConnections(stream);
+        thread::spawn(|| {
+            handleConnections(stream);
+        });
     }   
 
 }
