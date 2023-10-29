@@ -1,48 +1,42 @@
 use std::{
     fs,
-    io::{prelude::*,BufReader},
+    io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
     thread,
 };
 
-fn main() {
+mod routes;
+use routes::Router;
 
+fn main() {
+    let router = Router::new();
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        thread::spawn(|| {
-            handle_connections(stream);
-        });
-    }   
+        let cloned_router = router.clone(); // Clone the router for the thread
 
+        println!("Connection established!");
+
+        thread::spawn(move || {
+            handle_client(cloned_router, stream);
+        });
+    }
 }
 
-fn handle_connections(mut stream: TcpStream){
-    let mut buffer = [0;1024];
-    stream.read(&mut buffer).unwrap();
-    println!("Request: {}",String::from_utf8_lossy(&buffer[..]));
+fn handle_client(router: Router, mut stream: TcpStream) {
+    let mut request = String::new();
+    let mut reader = BufReader::new(&mut stream);
 
-    let get_request = b"GET / HTTP/1.1\r\n";
-    if buffer.starts_with(get_request){
-        send_response(stream);
-    }else{
-        send_error(stream);
+    if reader.read_to_string(&mut request).is_err() {
+        return;
     }
 
-}
- 
-fn send_response(mut stream:TcpStream){
-    let (status_line, response_content) = ("HTTP/1.1 200 OK", "<h1>Hello World</h1>");
-    let content_length = response_content.len();
-    let response = format!("{status_line}\r\nContent-Length: {content_length}\r\n\r\n{response_content}");
+    let http_header = request.lines().next().unwrap_or("").trim();
 
-    stream.write_all(response.as_bytes()).unwrap();
-}
-
-fn send_error(mut stream:TcpStream){
-    let (status_line, response_content) = ("HTTP/1.1 404 NOT FOUND", "<h1>Hmm, where is it?</h1>");
-    let content_length = response_content.len();
-    let response = format!("{status_line}\r\nContent-Length: {content_length}\r\n\r\n{response_content}");
-
-    stream.write_all(response.as_bytes()).unwrap();
+    if router.get_routes().contains_key(http_header) {
+        router.send_response(stream, http_header);
+    } else {
+        router.send_error(stream);
+    }
 }
