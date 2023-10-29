@@ -3,7 +3,6 @@ use std::{
     io::{prelude::*,BufReader},
     net::{TcpListener, TcpStream},
     thread,
-    time::Duration,
 };
 
 fn main() {
@@ -12,13 +11,13 @@ fn main() {
     for stream in listener.incoming() {
         let stream = stream.unwrap();
         thread::spawn(|| {
-            handleConnections(stream);
+            handle_connections(stream);
         });
     }   
 
 }
 
-fn handleConnections(mut stream: TcpStream){
+fn handle_connections(mut stream: TcpStream){
     let mut buffer = [0;1024];
     stream.read(&mut buffer).unwrap();
     println!("Request: {}",String::from_utf8_lossy(&buffer[..]));
