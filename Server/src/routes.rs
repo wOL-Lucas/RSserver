@@ -1,7 +1,12 @@
 use std::collections::HashMap;
-use std::net::TcpStream;
-use std::io::{prelude::*, BufReader};
-use std::fs;
+use std::{
+    fs,
+    io::{prelude::*, BufReader},
+    net::{TcpListener, TcpStream},
+    thread,
+};
+use std::sync::Arc;
+
 
 pub struct Router {
     routes: HashMap<String, String>,
@@ -10,7 +15,7 @@ pub struct Router {
 impl Router {
     fn create_routes() -> HashMap<String, String> {
         let mut routes: HashMap<String, String> = HashMap::new();
-        routes.insert("GET /home HTTP/1.1\r\n".to_string(), "./public/views/home/home.html".to_string());
+        routes.insert("GET /home HTTP/1.1".to_string(), "./public/views/home/home.html".to_string());
         routes
     }
 
@@ -39,12 +44,11 @@ impl Router {
         let response = format!("{status_line}\r\nContent-Length: {contents_length}\r\n\r\n{contents}");
         
         stream.write_all(response.as_bytes()).unwrap();
-
-
     }
 
     pub fn handle(&self, mut stream: TcpStream) {
         let http_header = BufReader::new(&mut stream).lines().next().unwrap().unwrap();
+        println!("Request: {}", http_header);
 
         if self.routes.contains_key(&http_header) {
             self.send_response(stream, &http_header);
@@ -59,5 +63,14 @@ impl Router {
 
     pub fn clone(&self) -> Router {
         Router { routes: self.routes.clone() }
+    }
+    
+    pub fn init_server(&self) {
+        let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
+        for stream in listener.incoming(){
+            let stream = stream.unwrap();
+            println!("Connection established!");
+            self.clone().handle(stream);
+        }
     }
 }
