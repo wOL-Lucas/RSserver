@@ -1,11 +1,17 @@
-use std::collections::HashMap;
 use std::{
     fs,
     io::{prelude::*, BufReader},
     net::{TcpListener, TcpStream},
     thread,
+    sync::Arc,
+    collections::HashMap,
+    env,
 };
-use std::sync::Arc;
+extern crate jsonwebtoken;
+use jsonwebtoken::{encode, Header, EncodingKey, Algorithm, Validation};
+
+mod claim;
+use claim::Claims;
 
 
 pub struct Router {
@@ -24,11 +30,11 @@ impl Router {
         Router { routes }
     }
 
-    pub fn send_response(&self, mut stream: TcpStream, http_header: &str) {
+    pub fn send_response(&self, mut stream: TcpStream, request_header: &str) {
         let status_line = "HTTP/1.1 200 OK";
         let binding = "".to_string();
 
-        let file_name = self.routes.get(http_header).unwrap_or(&binding);
+        let file_name = self.routes.get(request_header).unwrap_or(&binding);
         let contents = fs::read_to_string(file_name).unwrap();
         let contents_length = contents.len();
         let response = format!("{status_line}\r\nContent-Length: {contents_length}\r\n\r\n{contents}");
@@ -47,11 +53,11 @@ impl Router {
     }
 
     pub fn handle(&self, mut stream: TcpStream) {
-        let http_header = BufReader::new(&mut stream).lines().next().unwrap().unwrap();
-        println!("Request: {}", http_header);
+        let request_header = BufReader::new(&mut stream).lines().next().unwrap().unwrap();
+        println!("Request: {}", request_header);
 
-        if self.routes.contains_key(&http_header) {
-            self.send_response(stream, &http_header);
+        if self.routes.contains_key(&request_header) {
+            self.send_response(stream, &request_header);
         } else {
             self.send_error(stream);
         }
@@ -69,8 +75,30 @@ impl Router {
         let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
         for stream in listener.incoming(){
             let stream = stream.unwrap();
-            println!("Connection established!");
+
             self.clone().handle(stream);
         }
     }
+
+    pub fn generate_token() -> String{
+        let claim = Claims {
+            subject: "testing".to_string(),
+            issued: 0,
+            expires: 0,
+        };
+
+        let header = Header::new(Algorithm::HS256);
+        return encode(&header, &claim, &EncodingKey::from_secret(Self::get_secret_key().as_ref())).unwrap();
+    }
+
+    pub fn get_key() -> String {
+        let key_file = fs::read_to_string("../.key").unwrap();
+        return key_file
+    }
+
+    pub fn get_secret_key() -> String {
+        let secret_key = env::var("SECRET_KEY").unwrap_or_else(|_| "test".to_string());
+        return secret_key
+    }
+
 }
