@@ -10,8 +10,11 @@ use std::{
 extern crate jsonwebtoken;
 use jsonwebtoken::{encode, Header, EncodingKey, Algorithm, Validation};
 
-mod claim;
-use claim::Claims;
+pub struct Claims{
+    subject: String,
+    issued: i64,
+    expires: i64,
+}
 
 
 pub struct Router {
